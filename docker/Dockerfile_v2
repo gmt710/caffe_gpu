@@ -1,0 +1,119 @@
+
+FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+LABEL maintainer Gu Mengting <mengting.gu@hanshow.com>
+
+RUN sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list && \
+    apt-get clean && \
+    apt-get -y update 
+
+RUN sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list && \
+    apt-get clean && \
+    apt-get -y update && apt-get remove x264 libx264-dev && \
+    apt-get -y install libprotobuf-dev && \
+    apt-get -y install libleveldb-dev && \
+    apt-get -y install libsnappy-dev && \
+    apt-get -y install libopenblas-dev && \
+    apt-get -y install libopencv-dev  && \
+    apt-get -y install libhdf5-serial-dev  && \
+    apt-get -y install protobuf-compiler && \
+    apt-get -y install --no-install-recommends libboost-all-dev && \
+    apt-get -y install libatlas-base-dev && \
+    apt-get -y install libgflags-dev && \
+    apt-get -y install libgoogle-glog-dev  && \
+    apt-get -y install liblmdb-dev \
+        vim \
+        git \
+        openssl \
+        libssl-dev \
+        wget \
+        python3-numpy && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get -y update && apt-get -y install software-properties-common && \
+    sh -c '/bin/echo -e "\n" | add-apt-repository ppa:deadsnakes/ppa' && \
+    apt-get update && apt-get -y install python3.6 \
+    python3.6-dev \
+    python3-pip && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python2.7 50 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.5 100 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.6 150 && \ 
+    sh -c '/bin/echo -e "3" | update-alternatives --config python'
+
+RUN wget https://pypi.tuna.tsinghua.edu.cn/packages/69/60/f685fb2cfb3088736bafbc9bdbb455327bdc8906b606da9c9a81bae1c81e/torch-1.1.0-cp36-cp36m-manylinux1_x86_64.whl && \ 
+    python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple torch-1.1.0-cp36-cp36m-manylinux1_x86_64.whl && \ 
+    python --version && \
+    python -m pip --default-time=500 install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip && \
+    python -m pip --default-time=500 install -i https://pypi.tuna.tsinghua.edu.cn/simple numpy \
+    Cython &&\
+    python -m pip --default-time=5000 install -i https://pypi.tuna.tsinghua.edu.cn/simple torchvision==0.3.0 \
+    yacs \
+    tensorboard \
+    future \
+    termcolor \
+    sklearn \
+    tqdm \
+    opencv-python==4.1.0.25 \
+    matplotlib \
+    scikit-image \
+    faiss-gpu==1.6.3 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz && \
+    tar -xzvf boost_1_68_0.tar.gz && \
+    cd boost_1_68_0 && \
+    sh ./bootstrap.sh --with-python=/usr/bin/python3 --with-python-version=3.6 --with-libraries=all --with-toolset=gcc && \
+    ./b2 include="/usr/include/python3.6m/"  && \
+    ./b2 install  && \
+    cd /usr/local/lib  && \
+    ln -s libboost_python-py36.so libboost_python3.so  && \
+    ln -s libboost_python-py36.a libboost_python3.a  && \
+    cp /usr/local/lib/libboost_python36.a  /usr/lib/x86_64-linux-gnu/libboost_python_python36.a && \
+    cp /usr/local/lib/libboost_python36.so.1.68.0  /usr/lib/x86_64-linux-gnu/libboost_python3.so && \
+    cp /usr/local/lib/libboost_python36.so.1.68.0 /usr/lib/x86_64-linux-gnu/ && \
+    cp /usr/local/lib/libboost_system.so.1.68.0 /usr/lib/x86_64-linux-gnu/ && \
+    cp /usr/local/lib/libboost_filesystem.so.1.68.0 /usr/lib/x86_64-linux-gnu/ && \
+    cp /usr/local/lib/libboost_thread.so.1.68.0 /usr/lib/x86_64-linux-gnu/ && \
+    cd .. && \
+    rm -rf boost_1_68_0 && \
+    rm -rf /var/lib/apt/lists/* 
+
+
+ENV OPENCV_ROOT=/opt/opencv
+WORKDIR $OPENCV_ROOT
+RUN apt-get -y update && apt-get -y install cmake \
+    unzip && \
+    wget https://codeload.github.com/opencv/opencv/zip/3.4 -O opencv-3.4.zip && unzip opencv-3.4.zip && cd opencv-3.4 && \
+    mkdir build && cd build && \ 
+    cmake -D CMAKE_BUILD_TYPE=RELEASE \
+      -D PYTHON_DEFAULT_EXECUTABLE=/usr/bin/python \
+      -D PYTHON_INCLUDE_DIR=/usr/include/python3.6 \
+      -D PYTHON_INCLUDE_DIR2=/usr/include/x86_64-linux-gnu/python3.6m \
+      -D PYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.6m.so \
+      -D PYTHON3_NUMPY_INCLUDE_DIRS=/usr/lib/python3/dist-packages/numpy/core/include/ \
+      -D PYTHON3_EXECUTABLE=/usr/lib/python \
+      -D BUILD_opencv_python2=OFF \
+      -D CMAKE_INSTALL_PREFIX=/usr/local \
+      -D INSTALL_C_EXAMPLES=ON \
+      -D INSTALL_PYTHON_EXAMPLES=ON \
+      -D WITH_TBB=ON \
+      -D WITH_V4L=ON \
+      -D WITH_OPENGL=ON \
+      -D BUILD_EXAMPLES=ON .. && make -j"$(nproc)" && make install && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf && ldconfig
+
+
+ENV CAFFE_ROOT=/root/
+WORKDIR $CAFFE_ROOT
+# RUN git clone https://github.com/gmt710/caffe-ssd.git  && chmod 777 -R caffe-ssd && \
+#    cd caffe-ssd && make all -j8 && make pycaffe && make test -j8 && make runtest -j8
+
+RUN python -m pip --default-time=500 install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade numpy &&\
+    python -m pip --default-time=500 install -i https://pypi.tuna.tsinghua.edu.cn/simple pandas \
+    pykafka \
+    flask &&\
+    rm -rf /var/lib/apt/lists/*
+
